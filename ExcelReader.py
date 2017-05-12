@@ -6,8 +6,12 @@ class ExcelReader:
         self.fileName = file_name
         self.table = []
         wb = work_book(self.fileName, True)
+        head = True
         for sheet in wb.worksheets:
             for row in sheet.rows:
+                if head:
+                    head = False
+                    continue
                 values = []
                 for cell in row:
                     values.append(cell.value)
