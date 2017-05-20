@@ -14,5 +14,8 @@ class ExcelReader:
                     continue
                 values = []
                 for cell in row:
-                    values.append(cell.value)
+                    if cell.value is not None:
+                        values.append(cell.value)
+                    else:
+                        values.append("")
                 self.table.append(values)
