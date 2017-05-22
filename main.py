@@ -1,13 +1,9 @@
 from ExcelReader import ExcelReader as ExcelReader
 from AddressObject import AddressLine as AddressLine
 from SSHConnector import SSHConnector as Connector
-from geopy.geocoders import Nominatim
-from Request import get_json_result
-
-# geolocator = Nominatim(country_bias='Украина')
 
 separators = (" ", ",", ".", "-", "(", ")")
-key_word = ["building", "street", "apt"]
+key_word = ("building", "street", "apt")
 
 query_city_id = ("SELECT mp.id AS city\n"
                  "FROM words AS w\n"
@@ -31,14 +27,42 @@ query_app_id = ("SELECT mp.id AS ap_id\n"
                 "      AND mp.category_n = 1")
 
 query_address_id = ("SELECT a.id\n"
-                    "                FROM address a\n"
-                    "                WHERE a.settlement_id IN ({0})\n"
-                    "                      AND a.street_id IN ({1})")
+                    "FROM address a\n"
+                    "WHERE a.settlement_id IN ({0})\n"
+                    "     AND a.street_id IN ({1})")
+
+query_final_data = ("SELECT *\n"
+                    "FROM map_objects mp\n"
+                    "WHERE mp.id IN ({0})\n"
+                    "      AND mp.id IN ({1})")
 
 
 def get_array_words(string, separator_id):
     result = string.split(separators[separator_id])
     return result
+
+
+def get_word_id_string(string, full_search, comment):
+    words_array = (get_array_words(string, 0))
+    word_id_array = ""
+    print("!!!" + comment + "!!!")
+    find_for_full_search = False
+    for el in words_array:
+        word = el.lower()
+        find = False
+        if word in key_word:
+            continue
+        for word_row in words_table:
+            if word == word_row[1]:
+                find = True
+                find_for_full_search = True
+                word_id_array += (str(word_row[0]) + ",")
+            if find:
+                break
+        if full_search and find_for_full_search:
+            break
+    word_id_array = word_id_array[:len(word_id_array) - 1]
+    return word_id_array
 
 
 def distance(a, b):
@@ -76,21 +100,21 @@ for line in address_table:
         continue
     address_str = ""
     # do with city
-    word_id_array = ""
-    res = (get_array_words(line.city, 0))
-    print("!!!" + line.city + "!!!")
-    for el in res:
-        word = el.lower()
-        find = False
-        if word in key_word:
-            continue
-        for word_row in words_table:
-            if word == word_row[1]:
-                find = True
-                word_id_array += (str(word_row[0]) + ",")
-            if find:
-                break
-    word_id_array = word_id_array[:len(word_id_array) - 1]
+    word_id_array = get_word_id_string(line.city, False, "Search city")
+    # res = (get_array_words(line.city, 0))
+    # print("!!!" + line.city + "!!!")
+    # for el in res:
+    #     word = el.lower()
+    #     find = False
+    #     if word in key_word:
+    #         continue
+    #     for word_row in words_table:
+    #         if word == word_row[1]:
+    #             find = True
+    #             word_id_array += (str(word_row[0]) + ",")
+    #         if find:
+    #             break
+    # word_id_array = word_id_array[:len(word_id_array) - 1]
     print("city word id:" + word_id_array)
     city_obj_table = Connector(query_city_id.format(word_id_array)).tableResult
     city_obj_id = ""
@@ -137,151 +161,19 @@ for line in address_table:
         print("app:" + str(el[0]))
     app_obj_id += app_obj_id[:len(app_obj_id) - 1]
 
-    addr_obj_table = Connector(query_address_id.format(city_obj_id,street_obj_id)).tableResult
+    addr_obj_table = Connector(query_address_id.format(city_obj_id, street_obj_id)).tableResult
     addr_obj_id = ""
     for el in addr_obj_table:
         addr_obj_id += (str(el[0]) + ",")
         print("addr id:" + str(el[0]))
 
-
+    # do final query
+    print("Addr obj:" +addr_obj_id)
+    print("App obj:" + app_obj_id)
+    line_result = Connector(query_final_data.format(addr_obj_id, app_obj_id)).tableResult
+    for el in line_result:
+        print("RESULT")
+        print(el[0])
 
     if row_count == 3:
         break
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# rowcount = 0
-# count_ok = 0
-# for line in address_table:
-#     rowcount += 1
-#     address_str = ""
-#
-#     if line.city is not None:
-#         template_city = city_format(line.city)
-#     else:
-#         template_city = ""
-#
-#     if line.address is not None:
-#         template_street = street_format(line.address)
-#     else:
-#         template_street = ""
-#     query = {"city": template_city, "street": template_street}
-#     print(line)
-#     print("Row:" + str(rowcount))
-#     try:
-#         location = geolocator.geocode(query, False)
-#     except:
-#         print("Not connect to DB")
-#     if location is None:
-#         print("Empty result")
-#     else:
-#         if len(location) == 1:
-#             print(location[0].address)
-#             print((location[0].latitude, location[0].longitude))
-#         else:
-#             print("Find " + str(len(location)) + " result")
-#             for el in location:
-#                 print(el)
-#                 print((el.latitude, el.longitude))
-#     print("")
-
-
-
-
-
-
-
-
-
-# 169309 wordid
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# rowcount = 0
-# count_ok = 0
-# for line in address_table:
-#     rowcount += 1
-#     address_str = ""
-#     if line.city is not None:
-#         template_city = city_format(line.city)
-#     else:
-#         template_city = ""
-#     if line.address is not None:
-#         template_street = street_format(line.address)
-#     else:
-#         template_street = ""
-#     if template_street.find(template_city) >= 0:
-#         address_str = template_street
-#     elif template_city != "" and template_street != "":
-#         address_str = template_city + " " + template_street
-#     elif template_street == "":
-#         address_str = template_city
-#     else:
-#         address_str = template_street
-#
-#     if address_str == "":
-#         print("blank address row #" + rowcount)
-#         continue
-#     address_str.strip()
-#     print(address_str)
-#     result = get_json_result(address_str)
-#     print("line #" + str(rowcount) + " " + result['status'])
-#     if result['status'] == "OK":
-#         count_ok += 1
-#         print("OK " + str(count_ok))
-#
-#     if count_ok == 20:
-#         break
-#
-# print(count_ok)
