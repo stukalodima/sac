@@ -14,7 +14,7 @@ class SSHConnector:
                     ssh_password="D!m@$tuk@l0",
                     remote_bind_address=('sac', 5432)) as server:
                 server.start()
-                print("server connected")
+                # print("server connected")
 
                 params = {
                     'database': 'sac_db',
@@ -26,14 +26,14 @@ class SSHConnector:
 
                 connection = psycopg2.connect(**params)
                 cursor = connection.cursor()
-                print("database connected")
+                # print("database connected")
 
                 cursor.execute(text_sql)
                 self.tableResult = cursor.fetchall()
 
                 connection.close()
         except:
-            print("Connection Failed")
+            print("Connection Failed: " + text_sql)
 
     def __del__(self):
         self.tableResult = None
