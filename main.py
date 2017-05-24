@@ -135,6 +135,7 @@ def distance(a, b):
 
     return current_row[n]
 
+
 def get_wordID_linkID_array(array_wordID_linkID, array_wordID):
     for wordID in array_wordID:
         for linkID_row in links_table:
@@ -152,10 +153,11 @@ for line in table:
 databaseConnector = Connector("SELECT * FROM words")
 words_table = databaseConnector.tableResult
 del databaseConnector
-databaseConnector = Connector("SELECT * FROM links")
+databaseConnector = Connector("SELECT * \n"
+                              "FROM links l")
 links_table = databaseConnector.tableResult
 del databaseConnector
-
+exit(0)
 row_count = 0
 start_row = 34
 end_row = 34
