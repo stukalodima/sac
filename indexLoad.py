@@ -4,21 +4,6 @@ from SSHConnector import SSHConnector as Connector
 separators = (",", ".", "-", "(", ")", "/", "\\")
 key_word = dict()
 
-# obl = dict({1: ""})
-# rn = dict({"2": ""})
-# city = dict({"3": ""})
-# street = dict({"4": ""})
-# index_id = 3
-#
-# data_base = Connector(True)
-# parameters = {"adm_level1": int("".join(obl.keys())), "adm_level2": int("".join(rn.keys())),
-#               "settlement": int("".join(city.keys())),"street": int("".join(street.keys())), "index": int(index_id)}
-# data_base.insert_into_db("INSERT INTO index_chains (adm_level1, adm_level2, settlement, street, index) \n"
-#                          "VALUES (%(adm_level1)d, %(adm_level2)d, %(settlement)d, %(street)d, %(index)d)" % parameters,
-#                          True)
-
-# exit(0)
-
 
 def get_array_words(string, this_separator):
     words_array = string.split(this_separator)
@@ -83,11 +68,10 @@ def get_adm_level(word_array, word_array_from_db, comment):
 
 
 def get_key_from_dict(dict_for_search):
-    is_key = 0
+    is_key = 'null'
     for key in dict_for_search.keys():
         is_key = key
     return is_key
-
 
 index_file = ExcelReader("indexes1.xlsx")
 index_table = index_file.table
@@ -139,6 +123,8 @@ for line in index_table:
         data_base.insert_into_db("INSERT INTO indexes (index) VALUES ('%(index)s')" % {"index": index}, True)
         data_base.select_from_db("SELECT * FROM indexes WHERE index = '%(index)s'" % {"index": index}, True)
 
+    if len(data_base.tableResult) == 0:
+        continue
     index_id = data_base.tableResult[0][0]
 
     parameters = {"adm_level1": get_key_from_dict(obl), "adm_level2": get_key_from_dict(rn),
