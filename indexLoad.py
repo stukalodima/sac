@@ -1,80 +1,10 @@
 from ExcelReader import ExcelReader
-from SSHConnector import SSHConnector as Connector
+from PostgresConnector import PostgresConnector as Connector
+from Parser import Parser as Parser
+from DictUtils import DictUtils as DictUtils
+from MapObjectUtils import MapObjectUtils as MapObjectUtils
 
 separators = (",", ".", "-", "(", ")", "/", "\\")
-key_word = dict()
-
-
-def get_array_words(string, this_separator):
-    words_array = string.split(this_separator)
-    result = []
-    for word in words_array:
-        is_with_out_separator = True
-        check_word = word.strip()
-        for sep in separators:
-            if check_word.find(sep) != -1:
-                is_with_out_separator = False
-                tpm_result = get_array_words(check_word, sep)
-                for tmp_word in tpm_result:
-                    if tmp_word != "" and tmp_word not in result and tmp_word not in key_word:
-                        result.append(tmp_word)
-        if is_with_out_separator and check_word not in result and check_word not in key_word:
-            result.append(check_word)
-    return result
-
-
-def get_word_array(first_string, second_string):
-    print("Получаем слова по первой колонке...")
-    result_array = get_array_words(first_string.lower(), " ")
-    if len(result_array) == 0:
-        print("В первой колонке слов нет!!!")
-        print("Получаем слова по второй колонке...")
-        result_array = get_array_words(second_string.lower(), " ")
-        print(second_string)
-    else:
-        print(first_string)
-    return result_array
-
-
-def filter_dict(filtered_dict, owner, comment):
-    if len(filtered_dict) > 1:
-        list_keys_for_delete = []
-        for key, value in filtered_dict.items():
-            if value[2] not in owner.keys():
-                list_keys_for_delete.append(key)
-        if len(list_keys_for_delete) > 0:
-            for key in list_keys_for_delete:
-                filtered_dict.pop(key)
-    print(comment + str(filtered_dict))
-    return filtered_dict
-
-
-def get_adm_level(word_array, word_array_from_db, comment):
-    result_array = dict()
-    for word in word_array:
-        true_search = word in word_array_from_db.keys()
-        if true_search:
-            row_list = word_array_from_db.get(word)
-            for row in row_list:
-                result_array.update({row[2]: (row[3], row[4], row[5])})
-    if len(result_array) != 0:
-        print("Получили {0}:".format(comment))
-        for key, value in result_array.items():
-            print(str(key) + " | " + str(value))
-    else:
-        print("{0} не определили".format(comment))
-    print("\n")
-    return result_array
-
-
-def get_key_from_dict(dict_for_search):
-    is_key = 'null'
-    for key in dict_for_search.keys():
-        is_key = key
-    return is_key
-
-index_file = ExcelReader("indexes1.xlsx")
-index_table = index_file.table
 
 data_base = Connector(True)
 print("Читаем таблицу областей...")
@@ -90,45 +20,115 @@ print("Читаем таблицу улиц...")
 data_base.get_streets_word(True)
 print("Закончили читать таблицу улиц...")
 
-start_row = 25790
-row_count = 0
-for line in index_table:
-    row_count += 1
-    if row_count < start_row:
-        continue
-    if row_count > start_row + 20:
-        break
-    print(line)
+ind = 0
+while ind < 5:
+    filename = "indexes" + ("", "1", "2", "3", "4")[ind] + ".xlsx"
     print("\n")
-    words_array_obl = get_word_array(line[0], "")
-    obl = get_adm_level(words_array_obl, data_base.adm_level1, "Области")
-    words_array_rn = get_word_array(line[1], "")
-    rn = get_adm_level(words_array_rn, data_base.adm_level2, "районы")
-    words_array_city = get_word_array(line[2], "")
-    city = get_adm_level(words_array_city, data_base.settlement, "Города")
-    words_array_street = get_word_array(line[5], "")
-    street = get_adm_level(words_array_street, data_base.streets, "Улицы")
-    index = str(line[3])
-    while len(index) < 5:
-        index = "0" + index
-    print(index)
-    rn = filter_dict(rn, obl, "r-n: ")
-    city = filter_dict(city, rn, "city: ")
-    street = filter_dict(street, city, "street: ")
-    if len(street) == 0:
-        continue
+    print("Читаем " + filename + "...")
+    index_file = ExcelReader(filename)
+    print("Закончили читать " + filename + "...")
+    print("\n")
+    index_table = index_file.table
+    ind += 1
 
-    data_base.select_from_db("SELECT * FROM indexes WHERE index = '%(index)s'" % {"index": index}, True)
-    if len(data_base.tableResult) == 0:
-        data_base.insert_into_db("INSERT INTO indexes (index) VALUES ('%(index)s')" % {"index": index}, True)
+    row_count = 0
+    start_row = 25857
+    for line in index_table:
+        row_count += 1
+        # if row_count < start_row:
+        #     continue
+        # if row_count > start_row + 20:
+        #     break
+        print(line)
+        # Получаем слова для поиска адм. единиц
+        words_array_obl = Parser.get_word_array(line[0], separators, "")
+        words_array_rn = Parser.get_word_array(line[1], separators, "")
+        words_array_city = Parser.get_word_array(line[2], separators, "")
+        words_array_street = Parser.get_word_array(line[5], separators, "")
+
+        # Получаем адм. единицы
+        obl = MapObjectUtils.get_adm_level(words_array_obl, data_base.adm_level1, "Области")
+        rn = MapObjectUtils.get_adm_level(words_array_rn, data_base.adm_level2, "районы")
+        city = MapObjectUtils.get_adm_level(words_array_city, data_base.settlement, "Города")
+
+        # Название улиц может состоять из нескольких слов
+        # Нужно получить все ссылки и найти пересечения
+        maps = []
+        streets = dict()
+        for word in words_array_street:
+            text = get_text_query_street
+            data_base.select_from_db(text, False)
+            tmp_dict = dict()
+            tmp_dict = MapObjectUtils.get_adm_level_similar(data_base.tableResult, tmp_dict, "Улицы")
+            streets.update(tmp_dict)
+            tmp_set = set()
+            tmp_set.update(tmp_dict.keys())
+            maps.append(tmp_set)
+
+        # По каждому слову делаем множиства ссылок и ищем пересечение множеств
+        result_set = set()
+        result_set.update(maps[0])
+        for el_maps in maps:
+            result_set.intersection_update(el_maps)
+        street = dict()
+        for el_set in result_set:
+            street.update({el_set: streets.get(el_set)})
+
+        # Получаем индекс и если он меньше 5 символов добавляем лидирующие нули
+        index = str(line[3])
+        while len(index) < 5:
+            index = "0" + index
+
+        # Фильтруем все админ единици
+        print("obl: " + str(obl))
+        rn = DictUtils.filter_dict(rn, obl, "r-n: ")
+        if len(rn) == 0:
+            for key, value in obl.items():
+                if value[2] in city.keys():
+                    city = {value[2]: city.get(value[2])}
+        if len(city) > 1:
+            city = DictUtils.filter_dict(city, rn, "city: ")
+        else:
+            print("city: " + str(city))
+        street = DictUtils.filter_dict(street, city, "street_all: ")
+        street = DictUtils.filter_street_dict(street, line[4], "street: ")
+        # Если нет ни улици ни города то эта запись нам бесполезна
+        if len(street) == 0 and len(city) == 0:
+            continue
+
+        # Ищем ID индекса в базе
         data_base.select_from_db("SELECT * FROM indexes WHERE index = '%(index)s'" % {"index": index}, True)
+        # Если его нет записываем
+        if len(data_base.tableResult) == 0:
+            data_base.insert_into_db("INSERT INTO indexes (index) VALUES ('%(index)s')" % {"index": index}, True)
+            data_base.select_from_db("SELECT * FROM indexes WHERE index = '%(index)s'" % {"index": index}, True)
 
-    if len(data_base.tableResult) == 0:
-        continue
-    index_id = data_base.tableResult[0][0]
+        index_id = data_base.tableResult[0][0]
 
-    parameters = {"adm_level1": get_key_from_dict(obl), "adm_level2": get_key_from_dict(rn),
-                  "settlement": get_key_from_dict(city), "street": get_key_from_dict(street), "index": index_id}
-    data_base.insert_into_db("INSERT INTO index_chains (adm_level1, adm_level2, settlement, street, index) \n"
-                             "VALUES (%(adm_level1)s, %(adm_level2)s, %(settlement)s, %(street)s, %(index)s)\n"
-                             "" % parameters, True)
+        # Ищем запись об адресе в базе
+        parameters = {"adm_level1": DictUtils.get_key_isnull_from_dict(obl),
+                      "adm_level2": DictUtils.get_key_isnull_from_dict(rn),
+                      "settlement": DictUtils.get_key_isnull_from_dict(city),
+                      "street": DictUtils.get_key_isnull_from_dict(street),
+                      "index": index_id}
+
+        data_base.select_from_db(("SELECT *\n"
+                                  "FROM index_chains ic\n"
+                                  "WHERE ic.index = %(index)s\n"
+                                  "      AND ic.street %(street)s\n"
+                                  "      AND ic.settlement %(settlement)s\n"
+                                  "      AND ic.adm_level2 %(adm_level2)s\n"
+                                  "      AND ic.adm_level1 %(adm_level1)s" % parameters), True)
+        # Если она есть то переходим к следующей строке
+        if len(data_base.tableResult) != 0:
+            continue
+
+        # Записываем в базу записи об адресе по индексу
+        parameters = {"adm_level1": DictUtils.get_key_from_dict(obl), "adm_level2": DictUtils.get_key_from_dict(rn),
+                      "settlement": DictUtils.get_key_from_dict(city), "street": DictUtils.get_key_from_dict(street),
+                      "index": index_id}
+        data_base.insert_into_db("INSERT INTO index_chains (adm_level1, adm_level2, settlement, street, index) \n"
+                                 "VALUES (%(adm_level1)s, %(adm_level2)s, %(settlement)s, %(street)s, %(index)s)\n"
+                                 "" % parameters, True)
+
+        print(str(index) + " inserted!!!")

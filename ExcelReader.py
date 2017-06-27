@@ -19,3 +19,6 @@ class ExcelReader:
                     else:
                         values.append("")
                 self.table.append(values)
+
+    def __del__(self):
+        self.table = None
