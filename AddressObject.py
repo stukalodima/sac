@@ -1,4 +1,7 @@
 class AddressLine:
+    find_address = ""
+    centroid = ""
+
     def __init__(self, region, city, address, index):
         self.region = region
         self.city = city

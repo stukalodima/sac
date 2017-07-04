@@ -13,6 +13,9 @@ key_word = ("building", "street", "apt", "str", "app", "ap", "yl", "ul", "fl", "
 key_word_index = ("ukrpost", "ukraine", "ua", "-", "ukrposhta", "thezipc", "(", ")", "new", "mail", "code", "index",
                   "ind", "indeks", "postcode", "postal", "ukrain", "ukraina", "zip", ".", ",")
 
+key_word_replace = ("(до 30 кг на одне місце)", "(до 30 кг)", "до 30 кг на одне місце", "до 30 кг", "Відділення №1:",
+                    "Відділення №2:", "Відділення №3:", "Відділення №4:", "Відділення №5:", "Відділення №6:")
+
 replace_char = ("'", "\\'", "&quot;", '"', "№")
 
 words_table = []
@@ -53,7 +56,7 @@ print("Закончили читать таблицу соответствия �
 
 row_count = 0
 start_row = 1
-end_row = 10000
+end_row = 100
 find_city = 0
 find_street = 0
 find_index = 0
@@ -98,7 +101,10 @@ for line in address_table:
     if have_index:
         street_id_array = []
         print("Формируем слова для поиска улиц")
-        words_array_street = MapParser.get_word_array(line.address, key_word, separators, False)
+        new_address_str = line.address
+        for replace_word in key_word_replace:
+            new_address_str = new_address_str.replace(replace_word, "")
+        words_array_street = MapParser.get_word_array(new_address_str, key_word, separators, False)
         print("\nПробуем определить улицу")
         street = MapObjectUtils.get_adm_level(words_array_street, data_base.streets, "Улицы")
         street_id_array = data_base.streets_by_index.get(index_id)
@@ -162,21 +168,22 @@ for line in address_table:
                 if len(street) > 0:
                     streets_by_city = DictUtils.filter_dict(street, our_city, "Ulici")
                     if len(streets_by_city) == 1:
-                        our_street = streets_by_city.items()
+                        our_street = streets_by_city
                         print(our_street)
                     else:
                         print(streets_by_city)
+                        our_street = None
                 elif len(street_similar) > 0:
                     streets_by_city = DictUtils.filter_dict(street_similar, our_city, "Ulici similar")
                     if len(streets_by_city) == 1:
-                        our_street = streets_by_city.items()
+                        our_street = streets_by_city
                         print(our_street)
                     else:
                         print(streets_by_city)
                 elif len(street_lev) > 0:
                     streets_by_city = DictUtils.filter_dict(street_lev, our_city, "Ulici lev")
                     if len(streets_by_city) == 1:
-                        our_street = streets_by_city.items()
+                        our_street = streets_by_city
                         print(our_street)
                     else:
                         print(streets_by_city)
@@ -224,49 +231,93 @@ for line in address_table:
             if len(settlement) > 0:
                 streets_by_city = DictUtils.filter_dict(street, settlement, "Ulici")
                 if len(streets_by_city) > 0:
-                    our_street = streets_by_city.items()
+                    our_street = streets_by_city
             elif len(settlement_similar) > 0:
                 streets_by_city = DictUtils.filter_dict(street, settlement_similar, "Ulici")
                 if len(streets_by_city) > 0:
-                    our_street = streets_by_city.items()
+                    our_street = streets_by_city
             elif len(settlement_lev) > 0:
                 streets_by_city = DictUtils.filter_dict(street, settlement_lev, "Ulici")
                 if len(streets_by_city) > 0:
-                    our_street = streets_by_city.items()
+                    our_street = streets_by_city
         elif len(street_similar) > 0:
             if len(settlement) > 0:
                 streets_by_city = DictUtils.filter_dict(street_similar, settlement, "Ulici")
                 if len(streets_by_city) > 0:
-                    our_street = streets_by_city.items()
+                    our_street = streets_by_city
             elif len(settlement_similar) > 0:
                 streets_by_city = DictUtils.filter_dict(street_similar, settlement_similar, "Ulici")
                 if len(streets_by_city) > 0:
-                    our_street = streets_by_city.items()
+                    our_street = streets_by_city
             elif len(settlement_lev) > 0:
                 streets_by_city = DictUtils.filter_dict(street_similar, settlement_lev, "Ulici")
                 if len(streets_by_city) > 0:
-                    our_street = streets_by_city.items()
+                    our_street = streets_by_city
         elif len(street_lev) > 0:
             if len(settlement) > 0:
                 streets_by_city = DictUtils.filter_dict(street_lev, settlement, "Ulici")
                 if len(streets_by_city) > 0:
-                    our_street = streets_by_city.items()
+                    our_street = streets_by_city
             elif len(settlement_similar) > 0:
                 streets_by_city = DictUtils.filter_dict(street_lev, settlement_similar, "Ulici")
                 if len(streets_by_city) > 0:
-                    our_street = streets_by_city.items()
+                    our_street = streets_by_city
             elif len(settlement_lev) > 0:
                 streets_by_city = DictUtils.filter_dict(street_lev, settlement_lev, "Ulici")
                 if len(streets_by_city) > 0:
-                    our_street = streets_by_city.items()
-    # print("Формируем слова для поиска номера дома")
-    # words_array_kv = MapParser.get_word_array(line.address, key_word, separators, True)
-    # if our_city is not None:
-    #     find_city += 1
+                    our_street = streets_by_city
     if our_street is not None:
+        if type(our_street) == dict:
+            if len(our_street) != 1:
+                our_street = None
+            else:
+                tmp = ""
+                for el in our_street.keys():
+                    tmp = el
+                our_street = our_street.get(tmp)
+    print("Формируем слова для поиска номера дома")
+    words_array_kv = MapParser.get_word_array(line.address, key_word, separators, True)
+    print(words_array_kv)
+    if our_street is not None:
+        text = Connector.get_text_apartment(our_street[2], our_street[4])
+        data_base.select_from_db(text, False)
+        find_kv = False
+        kv = None
+        if len(data_base.tableResult) > 0 and len(words_array_kv) > 0:
+            for el in data_base.tableResult:
+                if el[1] == words_array_kv[0]:
+                    find_kv = True
+                    kv = el
+        if not find_kv and line.address.find("/") > -1 and len(words_array_kv) > 1:
+            if len(data_base.tableResult) > 0:
+                for el in data_base.tableResult:
+                    if el[1] == words_array_kv[0] + "/" + words_array_kv[1]:
+                        find_kv = True
+                        kv = el
+    if our_street is not None and kv is not None:
+        text = Connector.get_text_city_name(our_street[2])
+        data_base.select_from_db(text, False)
+        if len(data_base.tableResult) > 0:
+            city_name = data_base.tableResult[0][0]
         find_city += 1
         find_street += 1
+        line.find_address = city_name + " " + str(our_street[3]) + " " + str(our_street[1]) + " " + str(kv[1])
+        line.centroid = str(kv[0])
+    elif our_street is not None:
+        text = Connector.get_text_city_name(our_street[2])
+        data_base.select_from_db(text, False)
+        if len(data_base.tableResult) > 0:
+            city_name = data_base.tableResult[0][0]
+        find_city += 1
+        find_street += 1
+        num_kv = ""
+        if len(words_array_kv) > 0:
+            num_kv = words_array_kv[0]
+        line.find_address = city_name + " " + str(our_street[3]) + " " + str(our_street[1]) + " " + str(num_kv)
+        line.centroid = str(our_street[0])
     print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 print("City:" + str(find_city))
 print("Street:" + str(find_street))
 print("Index:" + str(find_index))
+
+ExcelReader.save_to_file('outFile.xlsx', address_table)

@@ -7,7 +7,7 @@ class MapObjectUtils:
             if true_search:
                 row_list = word_array_from_db.get(word)
                 for row in row_list:
-                    result_array.update({row[2]: (row[3], row[4], row[5], row[6])})
+                    result_array.update({row[2]: (row[3], row[4], row[5], row[6], row[2])})
         if len(result_array) == 0:
             print("{0} не определили".format(comment))
         return result_array
@@ -16,7 +16,7 @@ class MapObjectUtils:
     def get_adm_level_similar(table_in, comment):
         table_out = dict()
         for row in table_in:
-            table_out.update({row[0]: row})
+            table_out.update({row[0]: (row[1], row[3], row[2], row[4], row[0])})
         print("Получено {0} нечеткий поиск: {1}".format(comment, len(table_out)))
         print(table_out)
         return table_out
@@ -51,7 +51,7 @@ class MapObjectUtils:
                 if MapObjectUtils.lev(word, word_from_db) <= distance:
                     row_list = word_array_from_db.get(word_from_db)
                     for row in row_list:
-                        result_array.update({row[2]: (row[3], row[4], row[5], row[6])})
+                        result_array.update({row[2]: (row[3], row[4], row[5], row[6], row[2])})
         if len(result_array) == 0:
             print("{0} не определили".format(comment))
         return result_array

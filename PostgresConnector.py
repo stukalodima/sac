@@ -165,6 +165,7 @@ class PostgresConnector:
 
     def select_from_db(self, text, use_ssh):
         self.use_ssh = use_ssh
+        self.tableResult = []
         try:
             params = {
                 'database': 'sac_db',
@@ -352,6 +353,25 @@ class PostgresConnector:
         text += (") as t\n"
                  "  where t.similar > 0.1\n"
                  "ORDER BY t.similar DESC")
+        return text
+
+    @staticmethod
+    def get_text_city_name(city_id):
+        text = (("select n.name from settlements s\n"
+                 "  INNER JOIN map_objects mp on mp.id = s.id\n"
+                 "  INNER JOIN names n on n.name_id=mp.name_id and lang = 'uk'\n"
+                 "where s.id ={0}").format(city_id))
+
+        return text
+
+    @staticmethod
+    def get_text_apartment(city_id, street_id):
+        text = (("select st_astext(mp.centroid), n.name as apartment from address as ad\n"
+                 "  INNER JOIN map_objects mp on ad.id = mp.id\n"
+                 "  INNER JOIN names n on mp.name_id=n.name_id and n.lang = 'uk'\n"
+                 "where ad.street_id = {0}\n"
+                 "  and ad.settlement_id = {1}\n").format(street_id, city_id))
+
         return text
 
     @staticmethod
