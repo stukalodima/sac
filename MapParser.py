@@ -2,7 +2,7 @@ class MapParser:
 
     @staticmethod
     def get_array_words(string, key_word, separators, this_separator, find_digit):
-        replace_char = ("'", "\\'", "&quot;", '"')
+        replace_char = ("&quot;", '"')
         words_array = string.split(this_separator)
         result = []
         for word in words_array:
