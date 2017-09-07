@@ -1,288 +1,383 @@
 from ExcelReader import ExcelReader as ExcelReader
 from AddressObject import AddressLine as AddressLine
-from SSHConnector import SSHConnector as Connector
+from Address import Address as Address
+from PostgresConnector import PostgresConnector as Connector
+from MapParser import MapParser as MapParser
+from MapObjectUtils import MapObjectUtils as MapObjectUtils
+from DictUtils import DictUtils as DictUtils
 
-separators = (",", ".", "-", "(", ")", "/", "\\")
-key_word = {"building", "street", "apt", "str", "app", "ap", "yl", "ul", "fl", "kv", "highway", "bul", "apartment",
-            "avenue", "prospekt", "obl", "ave", "room", "region", "district", "pgt"}
+separators = (",", ".", "-", "(", ")", "/", "|", ":", ";")
+key_word = ("building", "street", "apt", "str", "app", "ap", "yl", "ul", "fl", "kv", "highway", "bul", "apartment",
+            "avenue", "prospekt", "obl", "ave", "room", "region", "district", "pgt", "область", "rayon", "selo", "city",
+            "flat", "prov", "", "kvartira", "pereulok")
+key_word_index = ("ukrpost", "ukraine", "ua", "-", "ukrposhta", "thezipc", "(", ")", "new", "mail", "code", "index",
+                  "ind", "indeks", "postcode", "postal", "ukrain", "ukraina", "zip", ".", ",")
 
-query_city_id = ("SELECT mp.id AS city\n"
-                 "FROM words AS w\n"
-                 "  INNER JOIN links l ON l.word_id = w.id\n"
-                 "  INNER JOIN map_objects mp ON mp.id = l.object_id\n"
-                 "WHERE w.id IN ({0})\n"
-                 "      AND mp.category_n = 3")
+key_word_replace = ("(до 30 кг на одне місце)", "(до 30 кг)", "до 30 кг на одне місце", "до 30 кг", "Відділення №1:",
+                    "Відділення №2:", "Відділення №3:", "Відділення №4:", "Відділення №5:", "Відділення №6:",
+                    "Відділення №1",
+                    "Відділення №2", "Відділення №3", "Відділення №4", "Відділення №5", "Відділення №6"
+                    )
 
-query_street_id = ("SELECT mp.id AS street_id\n"
-                   "FROM words AS w\n"
-                   "  INNER JOIN links l ON l.word_id = w.id\n"
-                   "  INNER JOIN map_objects mp ON mp.id = l.object_id\n"
-                   "WHERE w.id IN ({0})\n"
-                   "      AND mp.category_n = 2")
+type_of_adm_level = {"вул.": ["str", "str.", "street", "yl", "ul", "вул.", "вул", "вулиця", "st.", "st"],
+                     "пров.": ["пров", "пров.", "провулок", "prov", "pereulok"],
+                     "просп.": ["ave.", "ave", "prospekt", "avenue", "просп", "проспект"],
+                     "бульв.": ["bul.", "bul", "бульв", "бульв.", "бульвар"],
+                     "шосе": ["highway", "шосе", "shosse"]
+                     }
 
-query_address_id = ("SELECT a.id AS address_id, mp.id AS map_id, ST_AsText(mp.centroid) AS point, n.name\n"
-                    "FROM address a\n"
-                    "  INNER JOIN map_objects mp ON mp.id = a.id\n"
-                    "  INNER JOIN names n ON n.name_id = mp.name_id AND n.lang = 'ru'\n"
-                    "WHERE a.settlement_id IN ({0})\n"
-                    "     AND a.street_id IN ({1})")
+replace_char = ("&quot;", '"', "№")
 
+words_table = []
 
-def get_array_words(string, this_separator):
-    words_array = string.split(this_separator)
-    result = []
-    for word in words_array:
-        is_with_out_separator = True
-        for sep in separators:
-            if word.find(sep) != -1:
-                is_with_out_separator = False
-                tpm_result = get_array_words(word, sep)
-                for tmp_word in tpm_result:
-                    if tmp_word.strip() != "" and tmp_word.strip() not in result:
-                        result.append(tmp_word.strip())
-        if is_with_out_separator and word.lower() not in result:
-            result.append(word.lower())
-    return result
-
-
-def get_word_id_string(string, find_alpha, find_number, comment):
-    words_array = get_array_words(string, " ")
-    word_id_array = ""
-    print("!!!" + comment + "!!!")
-    for word in words_array:
-        find = False
-        if word in key_word or (len(word) == 1 and word.isalpha()) or len(word) == 0:
-            continue
-        if word.isalpha() and find_number:
-            continue
-        if word.isdigit() and find_alpha:
-            continue
-        count_a = 0
-        count_n = 0
-        for alp in word:
-            if alp.isalpha():
-                count_a += 1
-            if alp.isdigit():
-                count_n += 1
-        if count_n > 0 and (count_a == 1 or count_a == 2):
-            continue
-        for word_row in words_table:
-            if word == word_row[1]:
-                print(word_row[1] + " true find")
-                find = True
-                word_id_array += (str(word_row[0]) + ",")
-            if find:
-                break
-        if not find:
-            for word_row in words_table:
-                if distance(word, word_row[1]) <= (int(len(word) / 4) + 1):
-                    print(word_row[1])
-                    word_id_array += (str(word_row[0]) + ",")
-    word_id_array = word_id_array[:len(word_id_array) - 1]
-    return word_id_array
-
-
-def get_word_id_aray(string, find_alpha, find_number, comment):
-    words_array = get_array_words(string, " ")
-    word_id_array = []
-    print("!!!" + comment + "!!!")
-    for word in words_array:
-        find = False
-        if word in key_word or (len(word) == 1 and word.isalpha()) or len(word) == 0:
-            continue
-        if word.isalpha() and find_number:
-            continue
-        if word.isdigit() and find_alpha:
-            continue
-        count_a = 0
-        count_n = 0
-        for alp in word:
-            if alp.isalpha():
-                count_a += 1
-            if alp.isdigit():
-                count_n += 1
-        if count_n > 0 and (count_a == 1 or count_a == 2):
-            continue
-        for word_row in words_table:
-            if word == word_row[1]:
-                print(word_row[1] + " true find")
-                find = True
-                word_id_array.append(word_row[0])
-            if find:
-                break
-        if not find:
-            for word_row in words_table:
-                if distance(word, word_row[1]) <= (int(len(word) / 4) + 1):
-                    print(word_row[1])
-                    word_id_array.append(word_row[0])
-    return word_id_array
-
-
-def distance(a, b):
-    n, m = len(a), len(b)
-    if n > m:
-        a, b = b, a
-        n, m = m, n
-
-    current_row = range(n + 1)
-    for i in range(1, m + 1):
-        previous_row, current_row = current_row, [i] + [0] * n
-        for j in range(1, n + 1):
-            add, delete, change = previous_row[j] + 1, current_row[j - 1] + 1, previous_row[j - 1]
-            if a[j - 1] != b[i - 1]:
-                change += 1
-            current_row[j] = min(add, delete, change)
-
-    return current_row[n]
-
-
-def get_wordID_linkID_array(array_wordID_linkID, array_wordID):
-    for wordID in array_wordID:
-        for linkID_row in links_table:
-            if wordID == linkID_row[0]:
-                array_wordID_linkID.append()
-
-
+print("Читаем файл адресов...")
 reader = ExcelReader('inputFile.xlsx')
 table = reader.table
+reader = None
 address_table = []
 for line in table:
     address = AddressLine(*line)
     address_table.append(address)
+table = None
+print("Закончили читать файл адресов...")
 
-databaseConnector = Connector("SELECT * FROM words")
-words_table = databaseConnector.tableResult
-del databaseConnector
-databaseConnector = Connector("SELECT * \n"
-                              "FROM links l")
-links_table = databaseConnector.tableResult
-del databaseConnector
-exit(0)
+data_base = Connector(True)
+# print("Читаем таблицу областей...")
+# data_base.get_adm_level1_word(True)
+# print("Закончили читать таблицу областей...")
+# print("Читаем таблицу районов...")
+# data_base.get_adm_level2_word(True)
+# print("Закончили читать таблицу районов...")
+print("Читаем таблицу городов...")
+data_base.get_settlement_word(True)
+print("Закончили читать таблицу городов...")
+print("Читаем таблицу улиц...")
+data_base.get_streets_word(True)
+print("Закончили читать таблицу улиц...")
+print("Читаем таблицу индексов...")
+data_base.get_indexes_id(True)
+print("Закончили читать таблицу индексов...")
+print("Читаем таблицу соответствия индексов и городов...")
+data_base.get_settlement_by_index(True)
+print("Закончили читать таблицу соответствия индексов и городов...")
+print("Читаем таблицу соответствия индексов и улиц...")
+data_base.get_street_by_index(True)
+print("Закончили читать таблицу соответствия индексов и улиц...")
+
 row_count = 0
-start_row = 34
-end_row = 34
+start_row = 0
+end_row = 19555
+find_city = 0
+find_street = 0
+find_index = 0
+print("Побежали по строкам")
+print("\n")
+
+result_array = []
 for line in address_table:
     row_count += 1
     if row_count < start_row:
         continue
     if row_count > end_row:
         break
+
+    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+
+    print("Обрабатываем строку №" + str(row_count))
+    if len(line.city) == 0 and len(line.address) == 0 and len(line.index) == 0:
+        print("Обе колонки адреса пусты... искать нечего")
+        continue
     print(line)
-
-    # /////////////////////////////////
-    # array_wordID = get_word_id_aray()
-    # array_wordID_linkID = []
-    # get_wordID_linkID_array(array_wordID_linkID, array_wordID)
-    # /////////////////////////////////
-
-    # f = open('/home/dima/result.txt', 'a')
-    # f.write(line.city + " " + line.address)
-    # do with city
-    word_id_array = get_word_id_string(line.city, True, False, "Search city")
-    print("city word id:" + word_id_array)
-    is_address_parse = False
-    if len(word_id_array) == 0:
-        word_id_array = get_word_id_string(line.address, True, False, "Search city by address column")
-        print("city word id:" + word_id_array)
-        is_address_parse = True
-    if word_id_array == "":
-        print("CITY NOT FIND")
-        continue
-    city_obj_table = Connector(query_city_id.format(word_id_array)).tableResult
-    city_obj_id = ""
-    for el in city_obj_table:
-        city_obj_id += (str(el[0]) + ",")
-    city_obj_id = city_obj_id[:len(city_obj_id) - 1]
-    print("city object ID:" + city_obj_id)
-
-    # do with street
-    if not is_address_parse:
-        word_id_array = get_word_id_string(line.address, True, False, "Search street")
+    address = Address(line)
+    print("Ищем индекс " + line.index)
+    index_str = Connector.get_index_str(line.index, key_word_index)
+    print(index_str)
+    index_id = data_base.indexes.get(index_str)
+    if index_id is not None:
+        have_index = True
+        find_index += 1
+        print("Нашли индекс в базе")
     else:
-        print("Street was parse with city")
-    print("street word id:" + word_id_array)
-    if word_id_array == "":
-        print("STREET NOT FIND")
-        continue
-    street_obj_table = Connector(query_street_id.format(word_id_array)).tableResult
-    street_obj_id = ""
-    for el in street_obj_table:
-        street_obj_id += (str(el[0]) + ",")
-    street_obj_id = street_obj_id[:len(street_obj_id) - 1]
-    print("street object ID:" + street_obj_id)
+        have_index = False
+        print("Не нашли индекс в базе")
 
-    # do with apartment
-    # word_id_array = get_word_id_string(line.address, False, True, "Search apartment")
-    # print("apartment word id:" + word_id_array)
-    # app_obj_table = Connector(query_app_id.format(word_id_array)).tableResult
-    # app_obj_id = set()
-    # for el in app_obj_table:
-    #     app_obj_id.add(el[0])
-    # print(app_obj_id)
+    our_city = None
+    our_street = None
+    settlement = dict()
+    settlement_similar = dict()
+    settlement_lev = dict()
+    street = dict()
+    street_similar = dict()
+    street_lev = dict()
+    new_address_str = line.address
+    column_name_city = [line.city, new_address_str]
+    for replace_word in key_word_replace:
+        new_address_str = new_address_str.replace(replace_word, "")
+    street_type = MapObjectUtils.get_street_type(new_address_str, type_of_adm_level)
+    do_with_out_index = True
+    if have_index:
+        do_with_out_index = False
+        street_id_array = []
+        print("Формируем слова для поиска улиц")
+        tmp_address = new_address_str
+        new_address_str = new_address_str.replace(line.city, "")
+        words_array_street = MapParser.get_word_array(new_address_str, key_word, separators, False)
+        if len(words_array_street) == 0:
+            new_address_str = tmp_address
+            words_array_street = MapParser.get_word_array(new_address_str, key_word, separators, False)
+        print("\nПробуем определить улицу")
+        street = MapObjectUtils.get_adm_level(words_array_street, data_base.streets, "Улицы")
+        street_id_array = data_base.streets_by_index.get(index_id)
+        if len(street) > 0:
+            if street_type is not None:
+                street = MapObjectUtils.filter_street_by_type(street, street_type)
+            if len(street) > 0:
+                our_street = MapObjectUtils.get_street_from_index_array(street_id_array, street)
+                if our_street is not None:
+                    print(our_street)
+        if our_street is None:
+            print("Пробуем нечеткий поиск")
+            text = Connector.get_text_query_street(words_array_street)
+            data_base.select_from_db(text, False)
+            street_similar = MapObjectUtils.get_adm_level_similar(data_base.tableResult, "Улицы")
+            if len(street_similar) > 0:
+                if street_type is not None:
+                    street_similar = MapObjectUtils.filter_street_by_type(street_similar, street_type)
+                if len(street_similar) > 0:
+                    our_street = MapObjectUtils.get_street_from_index_array(street_id_array, street_similar)
+                    if our_street is not None:
+                        print(our_street)
+            if our_street is None:
+                print("Пробуем нечеткий поиск растояния Левенштейна")
+                street_lev = MapObjectUtils.get_adm_level_lev(words_array_street, data_base.streets,
+                                                              "Улицы по Левенштейну")
+                if street_type is not None:
+                    street_lev = MapObjectUtils.filter_street_by_type(street_lev, street_type)
+                if len(street_lev) > 0:
+                    our_street = MapObjectUtils.get_street_from_index_array(street_id_array, street_lev)
+                    if our_street is not None:
+                        print(our_street)
 
-    address_obj_table = Connector(query_address_id.format(city_obj_id, street_obj_id)).tableResult
-    address_obj_id = set()
-    apartment = get_array_words(line.address, " ")
-    apartment_key = ""
-    for ap in apartment:
-        count_a = 0
-        count_n = 0
-        for alp in ap:
-            if alp.isalpha():
-                count_a += 1
-            if alp.isdigit():
-                count_n += 1
-        if count_n > 0 and (count_a == 1 or count_a == 2):
-            for alp in ap:
-                if alp.isdigit():
-                    apartment_key += alp
-                if alp.isalpha():
-                    apartment_key += (alp.lower())
-            break
-        if ap.isdigit():
-            apartment_key = ap
-            break
-    if apartment_key == "":
-        print("APARTMENT NOT IN LINE")
-        continue
-    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-    # f.write(" | ")
-    find_apartment = False
-    print("apartment " + apartment_key)
-    for el in address_obj_table:
-        print("address:")
-        print(el)
-        if el[3] == apartment_key:
-            print(el[2])
-            find_apartment = True
-            break
+        if our_street is None:
+            count_way = 0
+            settlement_id = 0
+            while count_way < 2:
+                city_column_value = column_name_city[count_way]
+                count_way += 1
+                if our_city is not None:
+                    break
+                print("Формируем слова для поиска города")
+                words_array_city = MapParser.get_word_array(city_column_value, key_word, separators, False)
+                print("\nПробуем определить города")
+                settlement = MapObjectUtils.get_adm_level(words_array_city, data_base.settlement, "Города")
+                if len(settlement) > 0:
+                    settlement_id = data_base.settlement_by_index.get(index_id)
+                    our_city = {settlement_id: settlement.get(settlement_id)}
+                    if our_city is not None:
+                        print(our_city)
+                if our_city is None:
+                    print("Пробуем нечеткий поиск")
+                    text = Connector.get_text_query_setlements(words_array_city)
+                    data_base.select_from_db(text, False)
+                    settlement_similar = MapObjectUtils.get_adm_level_similar(data_base.tableResult, "Города")
+                    if our_city is None:
+                        settlement_id = data_base.settlement_by_index.get(index_id)
+                        our_city = {settlement_id: settlement_similar.get(settlement_id)}
+                        if our_city is not None:
+                            print(our_city)
+                    if our_city is None:
+                        print("Пробуем нечеткий поиск растояния Левенштейна")
+                        settlement_lev = MapObjectUtils.get_adm_level_lev(words_array_city, data_base.settlement,
+                                                                          "города по Левенштейну")
+                        settlement_id = data_base.settlement_by_index.get(index_id)
+                        our_city = {settlement_id: settlement_lev.get(settlement_id)}
+                        if our_city is not None:
+                            print(our_city)
+            if our_city is not None:
+                if len(street) > 0:
+                    streets_by_city = DictUtils.filter_dict(street, our_city, "Ulici")
+                    if len(streets_by_city) == 1:
+                        our_street = streets_by_city
+                        print(our_street)
+                    else:
+                        print(streets_by_city)
+                        our_street = None
+                elif len(street_similar) > 0:
+                    streets_by_city = DictUtils.filter_dict(street_similar, our_city, "Ulici similar")
+                    if len(streets_by_city) == 1:
+                        our_street = streets_by_city
+                        print(our_street)
+                    else:
+                        print(streets_by_city)
+                elif len(street_lev) > 0:
+                    streets_by_city = DictUtils.filter_dict(street_lev, our_city, "Ulici lev")
+                    if len(streets_by_city) == 1:
+                        our_street = streets_by_city
+                        print(our_street)
+                    else:
+                        print(streets_by_city)
+        if our_street is None and our_city is None:
+            do_with_out_index = True
+        elif our_city is not None:
+            if len(our_city) > 1 or len(our_city) == 0:
+                do_with_out_index = True
+            else:
+                for el in our_city.values():
+                    if el is not None and el[5] != 1:
+                        do_with_out_index = True
+
+    if do_with_out_index:
+        count_way = 0
+        settlement_id = 0
+        while count_way < 2:
+            city_column_value = column_name_city[count_way]
+            count_way += 1
+            if (settlement is not None and len(settlement) > 0) \
+                    or (settlement_similar is not None and len(settlement_similar) > 0) \
+                    or (settlement_lev is not None and len(settlement_lev) > 0):
+                break
+            print("Формируем слова для поиска города")
+            words_array_city = MapParser.get_word_array(city_column_value, key_word, separators, False)
+            print("\nПробуем определить города")
+            if settlement is None or len(settlement) == 0:
+                settlement = MapObjectUtils.get_adm_level(words_array_city, data_base.settlement, "Города")
+            if len(settlement) == 0:
+                print("Пробуем нечеткий поиск")
+                text = Connector.get_text_query_setlements(words_array_city)
+                data_base.select_from_db(text, False)
+                settlement_similar = MapObjectUtils.get_adm_level_similar(data_base.tableResult, "Города")
+                if len(settlement_similar) == 0:
+                    print("Пробуем нечеткий поиск растояния Левенштейна")
+                    settlement_lev = MapObjectUtils.get_adm_level_lev(words_array_city, data_base.settlement,
+                                                                      "города по Левенштейну")
+
+        street_id_array = []
+        print("Формируем слова для поиска улиц")
+        tmp_address = new_address_str
+        new_address_str = new_address_str.replace(line.city, "")
+        words_array_street = MapParser.get_word_array(new_address_str, key_word, separators, False)
+        if len(words_array_street) == 0:
+            new_address_str = tmp_address
+            words_array_street = MapParser.get_word_array(new_address_str, key_word, separators, False)
+        print("\nПробуем определить улицу")
+        street = MapObjectUtils.get_adm_level(words_array_street, data_base.streets, "Улицы")
+        if len(street) == 0:
+            print("Пробуем нечеткий поиск")
+            text = Connector.get_text_query_street(words_array_street)
+            data_base.select_from_db(text, False)
+            street_similar = MapObjectUtils.get_adm_level_similar(data_base.tableResult, "Улицы")
+            if len(street_similar) == 0:
+                print("Пробуем нечеткий поиск растояния Левенштейна")
+                street_lev = MapObjectUtils.get_adm_level_lev(words_array_street, data_base.streets,
+                                                              "Улицы по Левенштейну")
+
+        if street is not None and len(street) > 0:
+            if len(settlement) > 0:
+                streets_by_city = DictUtils.filter_dict(street, settlement, "Ulici")
+                if len(streets_by_city) > 0:
+                    our_street = streets_by_city
+            elif len(settlement_similar) > 0:
+                streets_by_city = DictUtils.filter_dict(street, settlement_similar, "Ulici")
+                if len(streets_by_city) > 0:
+                    our_street = streets_by_city
+            elif len(settlement_lev) > 0:
+                streets_by_city = DictUtils.filter_dict(street, settlement_lev, "Ulici")
+                if len(streets_by_city) > 0:
+                    our_street = streets_by_city
+        elif street_similar is not None and len(street_similar) > 0:
+            if len(settlement) > 0:
+                streets_by_city = DictUtils.filter_dict(street_similar, settlement, "Ulici")
+                if len(streets_by_city) > 0:
+                    our_street = streets_by_city
+            elif len(settlement_similar) > 0:
+                streets_by_city = DictUtils.filter_dict(street_similar, settlement_similar, "Ulici")
+                if len(streets_by_city) > 0:
+                    our_street = streets_by_city
+            elif len(settlement_lev) > 0:
+                streets_by_city = DictUtils.filter_dict(street_similar, settlement_lev, "Ulici")
+                if len(streets_by_city) > 0:
+                    our_street = streets_by_city
+        elif street_lev is not None and len(street_lev) > 0:
+            if len(settlement) > 0:
+                streets_by_city = DictUtils.filter_dict(street_lev, settlement, "Ulici")
+                if len(streets_by_city) > 0:
+                    our_street = streets_by_city
+            elif len(settlement_similar) > 0:
+                streets_by_city = DictUtils.filter_dict(street_lev, settlement_similar, "Ulici")
+                if len(streets_by_city) > 0:
+                    our_street = streets_by_city
+            elif len(settlement_lev) > 0:
+                streets_by_city = DictUtils.filter_dict(street_lev, settlement_lev, "Ulici")
+                if len(streets_by_city) > 0:
+                    our_street = streets_by_city
+    if our_street is not None:
+        if type(our_street) == dict:
+            if len(our_street) > 1:
+                if street_type is not None:
+                    our_street = MapObjectUtils.filter_street_by_type(our_street, street_type)
+            if len(our_street) != 1:
+                our_street = None
+            else:
+                tmp = ""
+                for el in our_street.keys():
+                    tmp = el
+                our_street = our_street.get(tmp)
+    if len(settlement) == 1:
+        our_city = settlement
+    else:
+        print(settlement)
+    print("Формируем слова для поиска номера дома")
+    words_array_kv = MapParser.get_word_array(new_address_str, key_word, separators, True)
+
+    if our_street is not None:
+        text = Connector.get_text_apartment(our_street[2], our_street[4])
+        data_base.select_from_db(text, False)
+        find_kv = False
+        kv = None
+        if len(data_base.tableResult) > 0 and len(words_array_kv) > 0:
+            for el in data_base.tableResult:
+                if el[1] == words_array_kv[0]:
+                    find_kv = True
+                    kv = el
+        if not find_kv and new_address_str.find("/") > -1 and len(words_array_kv) > 1:
+            if len(data_base.tableResult) > 0:
+                for el in data_base.tableResult:
+                    if el[1] == words_array_kv[0] + "/" + words_array_kv[1]:
+                        find_kv = True
+                        kv = el
+    if our_street is not None and kv is not None:
+        text = Connector.get_text_city_name(our_street[2])
+        data_base.select_from_db(text, False)
+        if len(data_base.tableResult) > 0:
+            city_name = data_base.tableResult[0][0]
+        find_city += 1
+        find_street += 1
+        line.find_address = city_name + " " + str(our_street[3]) + " " + str(our_street[1]) + " " + str(kv[1])
+        line.centroid = str(kv[0])
+    elif our_street is not None:
+        text = Connector.get_text_city_name(our_street[2])
+        data_base.select_from_db(text, False)
+        if len(data_base.tableResult) > 0:
+            city_name = data_base.tableResult[0][0]
+        find_city += 1
+        find_street += 1
+        num_kv = ""
+        if len(words_array_kv) > 0:
+            num_kv = words_array_kv[0]
+        line.find_address = city_name + " " + str(our_street[3]) + " " + str(our_street[1]) + " " + str(num_kv)
+        line.centroid = str(our_street[0])
+    elif our_city is not None:
+        if len(our_city) == 1:
+            for el in our_city.values():
+                if el is not None and el[5] == 1:
+                    line.find_address = el[1]
+                    line.centroid = str(el[0])
         else:
-            print("Not find")
-    if not find_apartment:
-        for el in address_obj_table:
-            if distance(el[3], apartment_key) <= 1:
-                print(el[2])
-                # f.write(el[2])
-    # f.write("\n")
-    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-    # f.close()
-    # address_obj_id.add(el[0])
-    # print("Address ID:" + str(address_obj_id))
-    # res_set = address_obj_id.intersection(app_obj_id)
-    # print("Intersection address and apartment:" + str(res_set))
-    #
-    # # do final query
-    # address_obj_id_str = ""
-    # for el_address in res_set:
-    #     address_obj_id_str += (str(el[0]) + ",")
-    #     address_obj_id_str = address_obj_id_str[:len(address_obj_id_str) - 1]
-    #
-    # line_result = Connector(query_final_data.format(address_obj_id_str)).tableResult
-    # if len(line_result) == 0:
-    #     print("Not found")
-    # res_count = 0
-    # for el in line_result:
-    #     print("RESULT " + str(res_count) + ":" + el[1])
+            print(our_city)
+    print("Город:")
+    print(our_city)
+    print("Улица:")
+    print(our_street)
+    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 
-    # if row_count == 20:
-    #     break
+ExcelReader.save_to_file('outFile.xlsx', address_table)
