@@ -46,7 +46,7 @@ class MapObjectUtils:
                         result_array.update({row[2]: (row[3], row[4], row[5], row[6], row[2], row[7])})
         if len(result_array) == 0:
             print("{0} не определили".format(comment))
-        print(result_array)
+        #print(result_array)
         return result_array
 
     @staticmethod

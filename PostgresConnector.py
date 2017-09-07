@@ -51,7 +51,7 @@ class PostgresConnector:
             connection.close()
 
         except:
-            print("Connection Failed: " + text)
+            print("Not results: ")
 
     def get_adm_level2_word(self, use_ssh):
         self.use_ssh = use_ssh
@@ -88,7 +88,7 @@ class PostgresConnector:
             connection.close()
 
         except:
-            print("Connection Failed: " + text)
+            print("Not results: ")
 
     def get_settlement_word(self, use_ssh):
         self.use_ssh = use_ssh
@@ -124,7 +124,7 @@ class PostgresConnector:
 
             connection.close()
         except:
-            print("Connection Failed: " + text)
+            print("Not results: ")
 
     def get_streets_word(self, use_ssh):
         self.use_ssh = use_ssh
@@ -161,7 +161,7 @@ class PostgresConnector:
 
             connection.close()
         except:
-            print("Connection Failed: " + text)
+            print("Not results: ")
 
     def select_from_db(self, text, use_ssh):
         self.use_ssh = use_ssh
@@ -183,7 +183,7 @@ class PostgresConnector:
 
             connection.close()
         except:
-            print("Connection Failed: " + text)
+            print("Not results: ")
 
     def insert_into_db(self, text, use_ssh):
         self.use_ssh = use_ssh
@@ -203,7 +203,7 @@ class PostgresConnector:
             connection.commit()
             connection.close()
         except:
-            print("Connection Failed: " + text)
+            print("Not results: ")
 
     def get_indexes_id(self, use_ssh):
         self.use_ssh = use_ssh
@@ -230,7 +230,7 @@ class PostgresConnector:
             connection.close()
 
         except:
-            print("Connection Failed: " + text)
+            print("Not results: ")
 
     def get_settlement_by_index(self, use_ssh):
         self.use_ssh = use_ssh
@@ -257,7 +257,7 @@ class PostgresConnector:
             connection.close()
 
         except:
-            print("Connection Failed: " + text)
+            print("Not results: ")
 
     def get_street_by_index(self, use_ssh):
         self.use_ssh = use_ssh
@@ -289,7 +289,7 @@ class PostgresConnector:
             connection.close()
 
         except:
-            print("Connection Failed: " + text)
+            print("Not results: ")
 
     def __del__(self):
         self.tableResult = None

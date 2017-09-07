@@ -65,8 +65,8 @@ data_base.get_street_by_index(True)
 print("Закончили читать таблицу соответствия индексов и улиц...")
 
 row_count = 0
-start_row = 15
-end_row = 15
+start_row = 0
+end_row = 19555
 find_city = 0
 find_street = 0
 find_index = 0
@@ -99,7 +99,7 @@ for line in address_table:
         print("Нашли индекс в базе")
     else:
         have_index = False
-        print("HELL не нашли индекс в базе")
+        print("Не нашли индекс в базе")
 
     our_city = None
     our_street = None
@@ -328,7 +328,7 @@ for line in address_table:
         print(settlement)
     print("Формируем слова для поиска номера дома")
     words_array_kv = MapParser.get_word_array(new_address_str, key_word, separators, True)
-    print(words_array_kv)
+
     if our_street is not None:
         text = Connector.get_text_apartment(our_street[2], our_street[4])
         data_base.select_from_db(text, False)
@@ -374,10 +374,10 @@ for line in address_table:
                     line.centroid = str(el[0])
         else:
             print(our_city)
-        print("fuf")
+    print("Город:")
+    print(our_city)
+    print("Улица:")
+    print(our_street)
     print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-print("City:" + str(find_city))
-print("Street:" + str(find_street))
-print("Index:" + str(find_index))
 
 ExcelReader.save_to_file('outFile.xlsx', address_table)
